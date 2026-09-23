@@ -4,7 +4,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 import books
-from books import BookCollection
+from books import Book, BookCollection, get_book_statistics
 
 
 @pytest.fixture(autouse=True)
@@ -51,3 +51,31 @@ def test_remove_book_invalid():
     collection = BookCollection()
     result = collection.remove_book("Nonexistent Book")
     assert result is False
+
+
+def test_get_book_statistics():
+    books_list = [
+        Book("New Book", "Author Two", 2020, read=True),
+        Book("Old Book", "Author One", 1950),
+        Book("Middle Book", "Author Three", 2000),
+    ]
+
+    result = get_book_statistics(books_list)
+
+    assert result["total_count"] == 3
+    assert result["read_count"] == 1
+    assert result["unread_count"] == 2
+    assert result["oldest_book"] == books_list[1]
+    assert result["newest_book"] == books_list[0]
+
+
+def test_get_book_statistics_empty_list():
+    result = get_book_statistics([])
+
+    assert result == {
+        "total_count": 0,
+        "read_count": 0,
+        "unread_count": 0,
+        "oldest_book": None,
+        "newest_book": None,
+    }

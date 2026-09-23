@@ -1,4 +1,7 @@
-def print_menu():
+from typing import List, Tuple
+
+
+def print_menu() -> None:
     print("\n📚 Book Collection App")
     print("1. Add a book")
     print("2. List books")
@@ -11,8 +14,21 @@ def get_user_choice() -> str:
     return input("Choose an option (1-5): ").strip()
 
 
-def get_book_details():
+def get_book_details() -> Tuple[str, str, int]:
+    """Prompt for and return the details of a new book.
+
+    Returns:
+        A tuple containing the stripped title, stripped author name, and
+        publication year as an integer. If the year is not a valid integer,
+        the returned year is ``0``.
+
+    Raises:
+        ValueError: If the entered title is empty or contains only whitespace.
+    """
     title = input("Enter book title: ").strip()
+    if not title:
+        raise ValueError("Book title cannot be empty.")
+
     author = input("Enter author: ").strip()
 
     year_input = input("Enter publication year: ").strip()
@@ -25,7 +41,7 @@ def get_book_details():
     return title, author, year
 
 
-def print_books(books):
+def print_books(books: List) -> None:
     if not books:
         print("No books in your collection.")
         return
