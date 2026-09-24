@@ -41,22 +41,70 @@ class BookCollection:
         self.books: List[Book] = []
         self.load_books()
 
-    def load_books(self):
-        """Load books from the JSON file if it exists."""
+    def load_books(self) -> None:
+        """Load valid books from the JSON file if it exists."""
         try:
-            with open(DATA_FILE, "r") as f:
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                self.books = [Book(**b) for b in data]
         except FileNotFoundError:
             self.books = []
-        except json.JSONDecodeError:
-            print("Warning: data.json is corrupted. Starting with empty collection.")
+            return
+        except PermissionError:
+            print(f"Error: permission denied while reading {DATA_FILE}.")
             self.books = []
+            return
+        except json.JSONDecodeError:
+            print(f"Warning: {DATA_FILE} contains invalid JSON. Starting empty.")
+            self.books = []
+            return
+        except OSError as error:
+            print(f"Error: could not read {DATA_FILE}: {error}")
+            self.books = []
+            return
 
-    def save_books(self):
+        if not isinstance(data, list):
+            print(f"Warning: {DATA_FILE} must contain a JSON array. Starting empty.")
+            self.books = []
+            return
+
+        valid_books = []
+        for index, item in enumerate(data):
+            if (
+                not isinstance(item, dict)
+                or not isinstance(item.get("title"), str)
+                or not isinstance(item.get("author"), str)
+                or not isinstance(item.get("year"), int)
+                or isinstance(item.get("year"), bool)
+                or (
+                    "read" in item
+                    and not isinstance(item.get("read"), bool)
+                )
+            ):
+                print(f"Warning: skipping malformed book at index {index}.")
+                continue
+
+            valid_books.append(
+                Book(
+                    title=item["title"],
+                    author=item["author"],
+                    year=item["year"],
+                    read=item.get("read", False),
+                )
+            )
+
+        self.books = valid_books
+
+    def save_books(self) -> None:
         """Save the current book collection to JSON."""
-        with open(DATA_FILE, "w") as f:
-            json.dump([asdict(b) for b in self.books], f, indent=2)
+        try:
+            with open(DATA_FILE, "w", encoding="utf-8") as f:
+                json.dump([asdict(b) for b in self.books], f, indent=2)
+        except PermissionError as error:
+            raise PermissionError(
+                f"Permission denied while writing {DATA_FILE}."
+            ) from error
+        except OSError as error:
+            raise OSError(f"Could not write {DATA_FILE}: {error}") from error
 
     def add_book(self, title: str, author: str, year: int) -> Book:
         book = Book(title=title, author=author, year=year)

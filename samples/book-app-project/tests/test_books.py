@@ -79,3 +79,49 @@ def test_get_book_statistics_empty_list():
         "oldest_book": None,
         "newest_book": None,
     }
+
+
+def test_load_books_skips_malformed_records():
+    with open(books.DATA_FILE, "w", encoding="utf-8") as data_file:
+        data_file.write(
+            '[{"title": "Valid", "author": "Author", "year": 2024},'
+            '{"title": "Missing year", "author": "Author"}]'
+        )
+
+    collection = BookCollection()
+
+    assert collection.list_books() == [Book("Valid", "Author", 2024)]
+
+
+def test_load_books_handles_non_array_json(capsys):
+    with open(books.DATA_FILE, "w", encoding="utf-8") as data_file:
+        data_file.write('{"title": "Not a list"}')
+
+    collection = BookCollection()
+
+    assert collection.list_books() == []
+    assert "must contain a JSON array" in capsys.readouterr().out
+
+
+def test_load_books_reports_permission_errors(monkeypatch, capsys):
+    def raise_permission_error(*args, **kwargs):
+        raise PermissionError("read-only file")
+
+    monkeypatch.setattr("builtins.open", raise_permission_error)
+
+    collection = BookCollection()
+
+    assert collection.list_books() == []
+    assert "permission denied while reading" in capsys.readouterr().out
+
+
+def test_save_books_reports_permission_errors(monkeypatch):
+    collection = BookCollection()
+
+    def raise_permission_error(*args, **kwargs):
+        raise PermissionError("read-only file")
+
+    monkeypatch.setattr("builtins.open", raise_permission_error)
+
+    with pytest.raises(PermissionError, match="Permission denied while writing"):
+        collection.save_books()
