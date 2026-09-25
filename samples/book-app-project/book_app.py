@@ -1,12 +1,14 @@
 import sys
-from books import BookCollection
+from typing import Sequence
+
+from books import Book, BookCollection
 
 
 # Global collection instance
 collection = BookCollection()
 
 
-def show_books(books):
+def show_books(books: list[Book]) -> None:
     """Display books in a user-friendly format."""
     if not books:
         print("No books found.")
@@ -21,45 +23,68 @@ def show_books(books):
     print()
 
 
-def handle_list():
+def handle_list() -> None:
     books = collection.list_books()
     show_books(books)
 
 
-def handle_add():
+def handle_add() -> None:
     print("\nAdd a New Book\n")
 
     title = input("Title: ").strip()
     author = input("Author: ").strip()
     year_str = input("Year: ").strip()
 
+    if not title:
+        print("\nError: Title cannot be empty.\n")
+        return
+
+    if not author:
+        print("\nError: Author cannot be empty.\n")
+        return
+
     try:
-        year = int(year_str) if year_str else 0
+        year = int(year_str)
+    except ValueError:
+        print("\nError: Year must be a valid integer.\n")
+        return
+
+    if year <= 0:
+        print("\nError: Year must be greater than zero.\n")
+        return
+
+    try:
         collection.add_book(title, author, year)
         print("\nBook added successfully.\n")
-    except ValueError as e:
-        print(f"\nError: {e}\n")
+    except (PermissionError, OSError) as error:
+        print(f"\nError: could not save the book: {error}\n")
 
 
-def handle_remove():
+def handle_remove() -> None:
     print("\nRemove a Book\n")
 
     title = input("Enter the title of the book to remove: ").strip()
-    collection.remove_book(title)
+    if not title:
+        print("\nError: Title cannot be empty.\n")
+        return
 
+    collection.remove_book(title)
     print("\nBook removed if it existed.\n")
 
 
-def handle_find():
+def handle_find() -> None:
     print("\nFind Books by Author\n")
 
     author = input("Author name: ").strip()
-    books = collection.find_by_author(author)
+    if not author:
+        print("\nError: Author cannot be empty.\n")
+        return
 
+    books = collection.find_by_author(author)
     show_books(books)
 
 
-def show_help():
+def show_help() -> None:
     print("""
 Book Collection Helper
 
@@ -72,12 +97,14 @@ Commands:
 """)
 
 
-def main():
-    if len(sys.argv) < 2:
+def main(argv: Sequence[str] | None = None) -> None:
+    args = list(sys.argv[1:] if argv is None else argv)
+
+    if not args:
         show_help()
         return
 
-    command = sys.argv[1].lower()
+    command = args[0].lower()
 
     if command == "list":
         handle_list()

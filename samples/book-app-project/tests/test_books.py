@@ -1,8 +1,11 @@
 import sys
 import os
+from unittest.mock import Mock
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
+import book_app
 import books
 from books import Book, BookCollection, get_book_statistics
 
@@ -125,3 +128,52 @@ def test_save_books_reports_permission_errors(monkeypatch):
 
     with pytest.raises(PermissionError, match="Permission denied while writing"):
         collection.save_books()
+
+
+def test_handle_add_rejects_empty_title(monkeypatch, capsys):
+    responses = iter(["   ", "Jane Austen", "1813"])
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(responses))
+
+    book_app.handle_add()
+
+    output = capsys.readouterr().out
+    assert "Title cannot be empty" in output
+    assert "Book added successfully" not in output
+
+
+def test_handle_add_rejects_empty_author(monkeypatch, capsys):
+    responses = iter(["Pride and Prejudice", "   ", "1813"])
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(responses))
+
+    book_app.handle_add()
+
+    output = capsys.readouterr().out
+    assert "Author cannot be empty" in output
+    assert "Book added successfully" not in output
+
+
+def test_handle_add_rejects_negative_year(monkeypatch, capsys):
+    responses = iter(["Pride and Prejudice", "Jane Austen", "-1813"])
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(responses))
+
+    book_app.handle_add()
+
+    output = capsys.readouterr().out
+    assert "Year must be greater than zero" in output
+    assert "Book added successfully" not in output
+
+
+def test_handle_add_handles_save_errors(monkeypatch, capsys):
+    responses = {
+        "Title: ": "Pride and Prejudice",
+        "Author: ": "Jane Austen",
+        "Year: ": "1813",
+    }
+    monkeypatch.setattr("builtins.input", lambda prompt="": responses[prompt])
+    monkeypatch.setattr(book_app.collection, "add_book", Mock(side_effect=PermissionError("disk full")))
+
+    book_app.handle_add()
+
+    output = capsys.readouterr().out
+    assert "could not save the book" in output
+    assert "disk full" in output
