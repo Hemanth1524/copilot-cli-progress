@@ -84,6 +84,18 @@ def handle_find() -> None:
     show_books(books)
 
 
+def handle_search() -> None:
+    print("\nSearch for a Book by Title\n")
+
+    title = input("Title: ").strip()
+    if not title:
+        print("\nError: Title cannot be empty.\n")
+        return
+
+    book = collection.find_book_by_title(title)
+    show_books([] if book is None else [book])
+
+
 def show_help() -> None:
     print("""
 Book Collection Helper
@@ -93,6 +105,7 @@ Commands:
   add      - Add a new book
   remove   - Remove a book by title
   find     - Find books by author
+  search   - Search for a book by title
   help     - Show this help message
 """)
 
@@ -114,6 +127,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         handle_remove()
     elif command == "find":
         handle_find()
+    elif command == "search":
+        handle_search()
     elif command == "help":
         show_help()
     else:

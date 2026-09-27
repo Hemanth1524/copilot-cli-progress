@@ -21,6 +21,11 @@ class BookStatistics(TypedDict):
     newest_book: Optional[Book]
 
 
+def get_book_titles(books: list[dict]) -> list[str]:
+    """Return titles present in a list of book dictionaries."""
+    return [book.get("title") for book in books if "title" in book]
+
+
 def get_book_statistics(books: List[Book]) -> BookStatistics:
     """Return reading and publication-year statistics for a list of books."""
     read_count = sum(book.read for book in books)
@@ -37,7 +42,7 @@ def get_book_statistics(books: List[Book]) -> BookStatistics:
 
 
 class BookCollection:
-    def __init__(self):
+    def __init__(self) -> None:
         self.books: List[Book] = []
         self.load_books()
 
@@ -94,11 +99,12 @@ class BookCollection:
 
         self.books = valid_books
 
-    def save_books(self) -> None:
+    def save_books(self, books: Optional[List[Book]] = None) -> None:
         """Save the current book collection to JSON."""
         try:
             with open(DATA_FILE, "w", encoding="utf-8") as f:
-                json.dump([asdict(b) for b in self.books], f, indent=2)
+                books_to_save = self.books if books is None else books
+                json.dump([asdict(b) for b in books_to_save], f, indent=2)
         except PermissionError as error:
             raise PermissionError(
                 f"Permission denied while writing {DATA_FILE}."
@@ -107,13 +113,44 @@ class BookCollection:
             raise OSError(f"Could not write {DATA_FILE}: {error}") from error
 
     def add_book(self, title: str, author: str, year: int) -> Book:
+        """Add a book to the collection and save the updated collection.
+
+        Args:
+            title: The book's title; must not be empty or whitespace-only.
+            author: The book's author; must not be empty or whitespace-only.
+            year: The book's publication year; must be greater than zero.
+
+        Returns:
+            The newly created book.
+
+        Raises:
+            ValueError: If the title or author is empty, or the year is not
+                positive.
+            OSError: If the updated collection cannot be saved.
+        """
+        if not title.strip():
+            raise ValueError("Title cannot be empty.")
+        if not author.strip():
+            raise ValueError("Author cannot be empty.")
+        if year <= 0:
+            raise ValueError("Year must be greater than zero.")
+
         book = Book(title=title, author=author, year=year)
+        self.save_books([*self.books, book])
         self.books.append(book)
-        self.save_books()
         return book
 
     def list_books(self) -> List[Book]:
-        return self.books
+        """Return a shallow copy of the books in the collection.
+
+        Changes to the returned list do not add or remove books in this
+        collection. The ``Book`` objects in the copy are shared with the
+        collection.
+
+        Returns:
+            A new list containing the collection's books.
+        """
+        return self.books.copy()
 
     def find_book_by_title(self, title: str) -> Optional[Book]:
         for book in self.books:

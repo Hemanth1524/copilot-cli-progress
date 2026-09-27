@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pytest
 import book_app
 import books
-from books import Book, BookCollection, get_book_statistics
+from books import Book, BookCollection, get_book_statistics, get_book_titles
 
 
 @pytest.fixture(autouse=True)
@@ -28,6 +28,49 @@ def test_add_book():
     assert book.author == "George Orwell"
     assert book.year == 1949
     assert book.read is False
+
+
+@pytest.mark.parametrize(
+    ("title", "author", "year", "message"),
+    [
+        ("   ", "Author", 2024, "Title cannot be empty"),
+        ("Title", "   ", 2024, "Author cannot be empty"),
+        ("Title", "Author", 0, "Year must be greater than zero"),
+        ("Title", "Author", -1, "Year must be greater than zero"),
+    ],
+)
+def test_add_book_rejects_invalid_inputs(title, author, year, message):
+    collection = BookCollection()
+
+    with pytest.raises(ValueError, match=message):
+        collection.add_book(title, author, year)
+
+    assert collection.list_books() == []
+
+
+def test_add_book_does_not_update_collection_when_save_fails(monkeypatch):
+    collection = BookCollection()
+
+    def fail_to_save(books=None):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(collection, "save_books", fail_to_save)
+
+    with pytest.raises(OSError, match="disk full"):
+        collection.add_book("1984", "George Orwell", 1949)
+
+    assert collection.books == []
+
+
+def test_list_books_returns_a_copy():
+    collection = BookCollection()
+    collection.add_book("1984", "George Orwell", 1949)
+
+    listed_books = collection.list_books()
+    listed_books.clear()
+
+    assert len(collection.books) == 1
+
 
 def test_mark_book_as_read():
     collection = BookCollection()
@@ -82,6 +125,33 @@ def test_get_book_statistics_empty_list():
         "oldest_book": None,
         "newest_book": None,
     }
+
+
+def test_get_book_titles():
+    books_list = [
+        {"title": "New Book", "author": "Author Two", "year": 2020},
+        {"title": "Old Book", "author": "Author One", "year": 1950},
+    ]
+
+    assert get_book_titles(books_list) == ["New Book", "Old Book"]
+
+
+def test_get_book_titles_skips_missing_titles():
+    books_list = [{"author": "Author"}, {"title": "Titled Book"}]
+
+    assert get_book_titles(books_list) == ["Titled Book"]
+
+
+def test_get_book_titles_empty_list():
+    assert get_book_titles([]) == []
+
+
+def test_find_book_by_title_is_case_insensitive():
+    collection = BookCollection()
+    expected_book = Book("Dune", "Frank Herbert", 1965)
+    collection.books.append(expected_book)
+
+    assert collection.find_book_by_title("dUnE") is expected_book
 
 
 def test_load_books_skips_malformed_records():
@@ -177,3 +247,41 @@ def test_handle_add_handles_save_errors(monkeypatch, capsys):
     output = capsys.readouterr().out
     assert "could not save the book" in output
     assert "disk full" in output
+
+
+def test_handle_search_displays_matching_book(monkeypatch, capsys):
+    collection = BookCollection()
+    expected_book = Book("Dune", "Frank Herbert", 1965)
+    collection.books.append(expected_book)
+    monkeypatch.setattr(book_app, "collection", collection)
+    monkeypatch.setattr("builtins.input", lambda prompt="": " dune ")
+
+    book_app.main(["search"])
+
+    output = capsys.readouterr().out
+    assert "Dune by Frank Herbert (1965)" in output
+
+
+def test_handle_search_reports_no_matching_book(monkeypatch, capsys):
+    monkeypatch.setattr(book_app, "collection", BookCollection())
+    monkeypatch.setattr("builtins.input", lambda prompt="": "Unknown title")
+
+    book_app.main(["search"])
+
+    assert "No books found." in capsys.readouterr().out
+
+
+def test_handle_search_rejects_empty_title(monkeypatch, capsys):
+    monkeypatch.setattr("builtins.input", lambda prompt="": "   ")
+
+    book_app.main(["search"])
+
+    output = capsys.readouterr().out
+    assert "Title cannot be empty" in output
+    assert "No books found." not in output
+
+
+def test_search_command_is_in_help(capsys):
+    book_app.main(["help"])
+
+    assert "search   - Search for a book by title" in capsys.readouterr().out
